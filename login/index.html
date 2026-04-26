@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Ashen | Login</title>
+
+<style>
+body{
+background:#0d0d12;
+color:#e5e7eb;
+font-family:Inter,Arial,sans-serif;
+height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+overflow:hidden;
+}
+
+.cursor-glow{
+position:fixed;
+width:420px;
+height:420px;
+border-radius:50%;
+pointer-events:none;
+background:rgba(255,120,40,.16);
+filter:blur(120px);
+transform:translate(-50%,-50%);
+z-index:0;
+}
+
+.login-card{
+position:relative;
+z-index:2;
+width:340px;
+padding:30px;
+border-radius:16px;
+background:rgba(255,255,255,.06);
+backdrop-filter:blur(18px);
+border:1px solid rgba(255,255,255,.12);
+box-shadow:0 10px 40px rgba(0,0,0,.45);
+display:flex;
+flex-direction:column;
+gap:16px;
+}
+
+.login-card h2{
+text-align:center;
+color:#ff7a18;
+}
+
+.input{
+padding:12px;
+border-radius:8px;
+border:1px solid rgba(255,255,255,.15);
+background:rgba(255,255,255,.06);
+color:white;
+outline:none;
+transition:.2s;
+}
+
+.input:focus{
+border-color:#ff7a18;
+}
+
+.btn{
+padding:12px;
+border:none;
+border-radius:8px;
+background:rgba(255,120,40,.45);
+color:white;
+cursor:pointer;
+transition:.2s;
+}
+
+.btn:hover{
+transform:translateY(-1px);
+background:rgba(255,120,40,.7);
+}
+
+.overlay{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,.4);
+backdrop-filter:blur(10px);
+opacity:0;
+pointer-events:none;
+transition:.3s;
+z-index:5;
+}
+
+.overlay.active{
+opacity:1;
+pointer-events:all;
+}
+
+.verify-box{
+position:fixed;
+top:50%;
+left:50%;
+transform:translate(-50%, -200%);
+width:320px;
+padding:24px;
+border-radius:14px;
+background:rgba(255,255,255,.06);
+backdrop-filter:blur(18px);
+border:1px solid rgba(255,255,255,.12);
+box-shadow:0 10px 40px rgba(0,0,0,.45);
+z-index:6;
+transition:.5s cubic-bezier(.2,.8,.2,1);
+display:flex;
+flex-direction:column;
+gap:14px;
+opacity:0;
+pointer-events:none;
+}
+
+.verify-box.active{
+transform:translate(-50%, -50%);
+opacity:1;
+pointer-events:all;
+}
+
+.verify-box h3{
+text-align:center;
+color:#ff7a18;
+}
+
+.success-box{
+position:absolute;
+z-index:3;
+font-size:22px;
+color:#ff7a18;
+opacity:0;
+transform:translateY(20px);
+transition:.4s;
+text-align:center;
+}
+
+.success-box.show{
+opacity:1;
+transform:translateY(0);
+}
+</style>
+</head>
+
+<body>
+
+<div class="cursor-glow"></div>
+
+<div class="login-card" id="loginCard">
+<h2>Login</h2>
+
+<input class="input" id="username" placeholder="Username">
+<input class="input" id="password" type="password" placeholder="Password">
+<input class="input" id="licenseKey" placeholder="License Key">
+
+<button class="btn" id="loginBtn">Submit</button>
+</div>
+
+<div class="success-box" id="successBox"></div>
+
+<div class="overlay" id="overlay"></div>
+
+<div class="verify-box" id="verifyBox">
+<h3>Verify Email</h3>
+<p style="font-size:13px;text-align:center;">A code was sent to your email</p>
+
+<input class="input" id="verifyInput" placeholder="Enter code">
+
+<button class="btn" id="verifyBtn">Verify</button>
+</div>
+
+<script>
+const glow=document.querySelector(".cursor-glow");
+let mx=0,my=0,cx=0,cy=0;
+
+document.addEventListener("mousemove",e=>{
+mx=e.clientX;my=e.clientY;
+});
+
+function anim(){
+cx+=(mx-cx)*0.08;
+cy+=(my-cy)*0.08;
+glow.style.left=cx+"px";
+glow.style.top=cy+"px";
+requestAnimationFrame(anim);
+}
+anim();
+
+const loginBtn=document.getElementById("loginBtn");
+const verifyBox=document.getElementById("verifyBox");
+const overlay=document.getElementById("overlay");
+const verifyBtn=document.getElementById("verifyBtn");
+const loginCard=document.getElementById("loginCard");
+const successBox=document.getElementById("successBox");
+
+async function checkSaved(){
+const saved=localStorage.getItem("ashenAuth");
+if(!saved)return;
+
+const data=JSON.parse(saved);
+
+const res=await fetch(`/ashen/apis/api.php?f=validateAccount&username=${data.username}&password=${data.password}&licenseKey=${data.licenseKey}`);
+const text=await res.text();
+
+if(text==="success"){
+loginCard.style.display="none";
+successBox.innerText=`You're all set, ${data.username}!`;
+successBox.classList.add("show");
+}
+}
+
+checkSaved();
+
+loginBtn.onclick=async()=>{
+const username=document.getElementById("username").value;
+const password=document.getElementById("password").value;
+const licenseKey=document.getElementById("licenseKey").value;
+
+const res=await fetch(`/ashen/apis/api.php?f=validateAccount&username=${username}&password=${password}&licenseKey=${licenseKey}`);
+const text=await res.text();
+
+if(text==="success"){
+await fetch(`/ashen/apis/api.php?f=sendVerificationEmail&username=${username}`);
+
+overlay.classList.add("active");
+verifyBox.classList.add("active");
+}else{
+alert(text);
+}
+};
+
+verifyBtn.onclick=async()=>{
+const username=document.getElementById("username").value;
+const password=document.getElementById("password").value;
+const licenseKey=document.getElementById("licenseKey").value;
+const code=document.getElementById("verifyInput").value;
+
+const res=await fetch(`/ashen/apis/api.php?f=verifyCode&username=${username}&verifyCode=${code}`);
+const text=await res.text();
+
+if(text==="success"){
+localStorage.setItem("ashenAuth",JSON.stringify({
+username,
+password,
+licenseKey
+}));
+
+verifyBox.classList.remove("active");
+overlay.classList.remove("active");
+
+loginCard.style.display="none";
+successBox.innerText=`You're all set, ${username}!`;
+successBox.classList.add("show");
+}else{
+alert(text);
+}
+};
+</script>
+
+</body>
+</html>
